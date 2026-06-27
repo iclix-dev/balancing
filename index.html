@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Application d'équilibrage expert</title>
+
+    <!-- PWA : manifeste et icônes -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3182ce">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Équilibrage">
+    <style>
+        :root { --primary: #3182ce; --secondary: #2b6cb0; --plan1: #3182ce; --plan2: #e53e3e; }
+        body { font-family: system-ui, sans-serif; background: #f0f2f5; margin: 0; padding: 10px; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1, h2, h3, h4 { color: #1a365d; margin-top: 0; }
+        .step { display: none; } .step.active { display: block; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+        .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        label { font-weight: 600; margin-bottom: 5px; display: block; color: #4a5568; font-size: 0.9em; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; box-sizing: border-box; }
+        
+        .radio-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .radio-group input { display: none; }
+        .radio-group label { flex: 1; padding: 10px; text-align: center; background: #e2e8f0; border-radius: 4px; font-weight: bold; cursor: pointer; color: #4a5568; font-size: 0.95em; }
+        .radio-group input:checked + label { background: var(--primary); color: white; }
+        .radio-group.danger input:checked + label { background: #e53e3e; color: white; }
+
+        .btn-group { display: flex; justify-content: space-between; margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        button { padding: 12px 20px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 1em; transition: 0.2s; }
+        button:hover { opacity: 0.9; }
+        .btn-primary { background: var(--primary); color: white; width: 100%; margin-top: 10px; }
+        .btn-secondary { background: #e2e8f0; color: #4a5568; }
+        .btn-action { background: #4a5568; color: white; padding: 8px 15px; font-size: 0.9em; }
+        .btn-print { background: #d69e2e; color: white; width: auto; }
+        
+        .top-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e2e8f0; }
+        .top-actions .btn-container { display: flex; gap: 10px; }
+        .status-badge { font-size: 0.85em; color: #718096; font-weight: 600; background: #edf2f7; padding: 5px 10px; border-radius: 12px; }
+        
+        .box-plan1 { border-top: 3px solid var(--plan1); background: #ebf8ff; padding: 10px; border-radius: 4px; }
+        .box-plan2 { border-top: 3px solid var(--plan2); background: #fff5f5; padding: 10px; border-radius: 4px; }
+        
+        .result-box { background: #ebf8ff; padding: 15px; border-left: 4px solid var(--primary); margin-bottom: 15px; }
+        .warning-box { background: #fff5f5; padding: 15px; border-left: 4px solid #e53e3e; margin-bottom: 15px; }
+        .estimation-box { background: #f0fff4; padding: 15px; border-left: 4px solid #38a169; }
+        .iso-box { display: flex; justify-content: space-between; align-items: center; background: #fffaf0; padding: 15px; border-left: 4px solid #ed8936; margin-bottom: 15px; }
+        
+        .badge { padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 1.1em; text-align: center; }
+        .badge-ok { background: #c6f6d5; color: #22543d; }
+        .badge-nok { background: #fed7d7; color: #822727; }
+        .badge-na { background: #e2e8f0; color: #4a5568; }
+
+        .canvas-container { display: flex; justify-content: center; align-items: center; flex-direction: column; width: 100%; }
+        .canvas-container h4 { margin: 5px 0 10px 0; color: #4a5568; text-align: center; }
+        canvas { background: #fff; border-radius: 5px; border: 1px solid #e2e8f0; margin-top: 5px; width: 100%; max-width: 250px; height: auto; }
+        
+        #print_area { display: none; }
+        
+        @media screen and (max-width: 600px) {
+            .grid-2, .grid-4 { grid-template-columns: 1fr; gap: 10px; }
+            button { width: 100%; margin-bottom: 10px; }
+            .btn-group { flex-direction: column; }
+            .top-actions { flex-direction: column; align-items: stretch; gap: 10px; }
+            .top-actions .btn-container { justify-content: space-between; }
+            .top-actions button { width: 48%; margin: 0; }
+            .status-badge { text-align: center; }
+        }
+
+        @media print {
+            body { background: white; padding: 0; font-size: 10pt; }
+            .container { box-shadow: none; padding: 0; }
+            .top-actions, .btn-group, button, .step { display: none !important; }
+            #print_area { display: block !important; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9em; }
+            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .print-graphs { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 15px; }
+            .print-img { max-width: 180px; margin: 5px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-actions">
+        <div class="btn-container">
+            <button class="btn-action" onclick="sauvegarderSessionManuelle()">Exporter session</button>
+            <button class="btn-action" onclick="document.getElementById('file_loader').click()">Importer session</button>
+            <input type="file" id="file_loader" accept=".json" style="display:none" onchange="chargerSession(event)">
+        </div>
+        <div class="status-badge" id="autosave_status">Sauvegarde auto active</div>
+    </div>
+
+    <div id="ui_area">
+        <h1>Équilibrage expert</h1>
+
+        <!-- Étape 1 : Configuration -->
+        <div id="step1" class="step active">
+            <h2>1. Configuration de la machine</h2>
+            
+            <div class="grid-2">
+                <div>
+                    <label>Tag de la machine / repère</label>
+                    <input type="text" id="cfg_tag" placeholder="Ex: VENT-01" oninput="updateUI()">
+                    
+                    <label style="margin-top:10px;">Nombre de plans d'équilibrage</label>
+                    <div class="radio-group">
+                        <input type="radio" id="plan_1" name="cfg_nb_plans" value="1" checked onchange="updateUI()">
+                        <label for="plan_1">1 Plan</label>
+                        <input type="radio" id="plan_2" name="cfg_nb_plans" value="2" onchange="updateUI()">
+                        <label for="plan_2">2 Plans</label>
+                    </div>
+
+                    <label>Vitesse de rotation (tr/min)</label>
+                    <input type="number" id="cfg_rpm" value="1500" oninput="updateUI()">
+                    
+                    <label style="margin-top:10px;">Sens de rotation</label>
+                    <div class="radio-group">
+                        <input type="radio" id="rot_cw" name="cfg_rotation" value="cw" checked onchange="updateUI()">
+                        <label for="rot_cw">Horaire</label>
+                        <input type="radio" id="rot_ccw" name="cfg_rotation" value="ccw" onchange="updateUI()">
+                        <label for="rot_ccw">Anti-horaire</label>
+                    </div>
+                </div>
+                
+                <div>
+                    <label>Angle du tachymètre (°)</label><input type="number" id="cfg_ang_tacho" value="0" oninput="updateUI()">
+                    
+                    <div class="box-plan1" style="margin-top: 10px; padding: 10px; padding-bottom: 0px;">
+                        <h4 style="margin:0 0 5px 0;">Palier 1</h4>
+                        <label>Angle capteur horizontal H1 (°)</label><input type="number" id="cfg_ang_h1" value="90" oninput="updateUI()">
+                        <label>Angle capteur vertical V1 (°)</label><input type="number" id="cfg_ang_v1" value="0" oninput="updateUI()">
+                    </div>
+                    
+                    <div class="box-plan2 elem-plan2" style="display:none; margin-top: 10px; padding: 10px; padding-bottom: 0px;">
+                        <h4 style="margin:0 0 5px 0;">Palier 2</h4>
+                        <label>Angle capteur horizontal H2 (°)</label><input type="number" id="cfg_ang_h2" value="90" oninput="updateUI()">
+                        <label>Angle capteur vertical V2 (°)</label><input type="number" id="cfg_ang_v2" value="0" oninput="updateUI()">
+                    </div>
+                    
+                    <div class="canvas-container" style="margin-top: 15px;">
+                        <canvas id="schemaPalier" width="250" height="250"></canvas>
+                        <small style="margin-top:5px; color:#666;">Vue de face.</small>
+                    </div>
+                </div>
+            </div>
+
+            <h3>Paramètres du rotor & ISO 21940</h3>
+            <div class="grid-2">
+                <div>
+                    <label>Type d'équilibrage</label>
+                    <div class="radio-group">
+                        <input type="radio" id="type_angulaire" name="cfg_type_rotor" value="angulaire" checked onchange="updateUI()">
+                        <label for="type_angulaire">Angulaire (360°)</label>
+                        <input type="radio" id="type_discret" name="cfg_type_rotor" value="discret" onchange="updateUI()">
+                        <label for="type_discret">Discret (pales)</label>
+                    </div>
+                    <div class="cfg-discrete" style="display:none;"><label>Nombre de positions</label><input type="number" id="cfg_nb_pos" value="8" oninput="updateUI()"></div>
+                    <div class="cfg-discrete" style="display:none;"><label>Angle de la position 1 (°)</label><input type="number" id="cfg_ang_p1" value="0" oninput="updateUI()"></div>
+                </div>
+                <div>
+                    <label>Masse du rotor (kg)</label><input type="number" id="cfg_masse_rotor" placeholder="Ex: 250" oninput="updateUI()">
+                    <label>Rayon de correction (mm)</label><input type="number" id="cfg_rayon_corr" placeholder="Ex: 400" oninput="updateUI()">
+                    <label>Grade ISO (G)</label>
+                    <div class="radio-group">
+                        <input type="radio" id="iso_63" name="cfg_grade_iso" value="6.3" checked onchange="updateUI()">
+                        <label for="iso_63">G 6.3</label>
+                        <input type="radio" id="iso_25" name="cfg_grade_iso" value="2.5" onchange="updateUI()">
+                        <label for="iso_25">G 2.5</label>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="goToStep(2)">Suivant : Lancer à vide</button>
+        </div>
+
+        <!-- Étape 2 : Lancer à vide -->
+        <div id="step2" class="step">
+            <h2>2. Lancer à vide (V0)</h2>
+            
+            <div class="grid-2">
+                <div class="box-plan1">
+                    <h3>Palier / Plan 1</h3>
+                    <label>Voie horizontale (H1)</label>
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                        <input type="number" id="v0_1h_a" placeholder="Amp (mm/s)">
+                        <input type="number" id="v0_1h_p" placeholder="Phase (°)">
+                    </div>
+                    <label>Voie verticale (V1)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="v0_1v_a" placeholder="Amp (mm/s)">
+                        <input type="number" id="v0_1v_p" placeholder="Phase (°)">
+                    </div>
+                </div>
+                
+                <div class="box-plan2 elem-plan2" style="display:none;">
+                    <h3>Palier / Plan 2</h3>
+                    <label>Voie horizontale (H2)</label>
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                        <input type="number" id="v0_2h_a" placeholder="Amp (mm/s)">
+                        <input type="number" id="v0_2h_p" placeholder="Phase (°)">
+                    </div>
+                    <label>Voie verticale (V2)</label>
+                    <div style="display:flex; gap:5px;">
+                        <input type="number" id="v0_2v_a" placeholder="Amp (mm/s)">
+                        <input type="number" id="v0_2v_p" placeholder="Phase (°)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="goToStep(1)">Précédent</button>
+                <button class="btn-primary" onclick="goToStep(3)" style="margin-top:0; width:auto;">Suivant : Lancer d'essai 1</button>
+            </div>
+        </div>
+
+        <!-- Étape 3 : Lancer d'essai 1 -->
+        <div id="step3" class="step">
+            <h2>3. Lancer d'essai (V1) - Plan 1</h2>
+            <div class="box-plan1" style="margin-bottom:15px;">
+                <label>Masse d'essai posée sur le PLAN 1 (g)</label>
+                <input type="number" id="mt1_a" placeholder="Ex: 50" style="margin-bottom:10px;">
+                <div class="mt-continu"><label>Position (°)</label><input type="number" id="mt1_p" placeholder="Ex: 0"></div>
+                <div class="mt-discret" style="display:none;"><label>Position (N°)</label><input type="number" id="mt1_pos" min="1"></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="box-plan1">
+                    <h4>Relevé Palier 1</h4>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v1_1h_a" placeholder="H1 Amp"><input type="number" id="v1_1h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v1_1v_a" placeholder="V1 Amp"><input type="number" id="v1_1v_p" placeholder="Phase"></div>
+                </div>
+                <div class="box-plan2 elem-plan2" style="display:none;">
+                    <h4>Relevé Palier 2 (Effet croisé)</h4>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v1_2h_a" placeholder="H2 Amp"><input type="number" id="v1_2h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v1_2v_a" placeholder="V2 Amp"><input type="number" id="v1_2v_p" placeholder="Phase"></div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="goToStep(2)">Précédent</button>
+                <button class="btn-primary" onclick="handleStep3Next()" style="margin-top:0; width:auto;" id="btn_next_step3">Suivant</button>
+            </div>
+        </div>
+
+        <!-- Étape 4 : Lancer d'essai 2 (2 Plans uniquement) -->
+        <div id="step4" class="step">
+            <h2>4. Lancer d'essai (V2) - Plan 2</h2>
+            <div class="box-plan2" style="margin-bottom:15px;">
+                <label>Masse d'essai posée sur le PLAN 2 (g)</label>
+                <input type="number" id="mt2_a" placeholder="Ex: 50" style="margin-bottom:10px;">
+                <div class="mt-continu"><label>Position (°)</label><input type="number" id="mt2_p" placeholder="Ex: 0"></div>
+                <div class="mt-discret" style="display:none;"><label>Position (N°)</label><input type="number" id="mt2_pos" min="1"></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="box-plan1">
+                    <h4>Relevé Palier 1 (Effet croisé)</h4>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v2_1h_a" placeholder="H1 Amp"><input type="number" id="v2_1h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v2_1v_a" placeholder="V1 Amp"><input type="number" id="v2_1v_p" placeholder="Phase"></div>
+                </div>
+                <div class="box-plan2">
+                    <h4>Relevé Palier 2</h4>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v2_2h_a" placeholder="H2 Amp"><input type="number" id="v2_2h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v2_2v_a" placeholder="V2 Amp"><input type="number" id="v2_2v_p" placeholder="Phase"></div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="goToStep(3)">Précédent</button>
+                <button class="btn-primary" onclick="calculerCorrection(); goToStep(5)" style="margin-top:0; width:auto;">Calculer corrections</button>
+            </div>
+        </div>
+
+        <!-- Étape 5 : Correction -->
+        <div id="step5" class="step">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h2>Résultats & Correction</h2>
+                <button class="btn-print" onclick="preparerRapport()">Générer PDF</button>
+            </div>
+
+            <div class="warning-box">
+                <label>État des masses d'essai sur le rotor :</label>
+                <div class="grid-2" style="margin-bottom:0;">
+                    <div>
+                        <span style="font-size:0.8em; font-weight:bold;">Plan 1 :</span>
+                        <select id="etat_masse_1" onchange="calculerCorrection()">
+                            <option value="retiree">Retirée</option>
+                            <option value="laisse">Laissée en place</option>
+                        </select>
+                    </div>
+                    <div class="elem-plan2" style="display:none;">
+                        <span style="font-size:0.8em; font-weight:bold;">Plan 2 :</span>
+                        <select id="etat_masse_2" onchange="calculerCorrection()">
+                            <option value="retiree">Retirée</option>
+                            <option value="laisse">Laissée en place</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="iso-box">
+                <div>
+                    <h3>Statut ISO 21940 (Mesuré)</h3>
+                    <p>Tolérance par plan : <strong id="iso_mass_target">-</strong> g</p>
+                    <p id="iso_detail" style="font-size:0.85em; color:#666;">Balourd évalué en direct</p>
+                </div>
+                <div id="badge_iso_status" class="badge badge-na">Non évalué</div>
+            </div>
+
+            <div class="grid-2">
+                <div class="result-box box-plan1">
+                    <h3>Cible Plan 1</h3>
+                    <p>Vecteur idéal : <strong id="res_p1_masse">-</strong> g à <strong id="res_p1_phase">-</strong> °</p>
+                </div>
+                <div class="result-box box-plan2 elem-plan2" style="display:none;">
+                    <h3>Cible Plan 2</h3>
+                    <p>Vecteur idéal : <strong id="res_p2_masse">-</strong> g à <strong id="res_p2_phase">-</strong> °</p>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="canvas-container">
+                    <h4>Vibrations (mm/s)</h4>
+                    <canvas id="polarVibrations1" width="220" height="220"></canvas>
+                    <span style="font-size:0.8em; font-weight:bold; color:var(--plan1)">Plan 1</span>
+                </div>
+                <div class="canvas-container">
+                    <h4>Corrections Cibles (g)</h4>
+                    <canvas id="polarResult1" width="220" height="220"></canvas>
+                    <span style="font-size:0.8em; font-weight:bold; color:var(--plan1)">Plan 1</span>
+                </div>
+            </div>
+            
+            <div class="grid-2 elem-plan2" style="display:none; margin-top:20px;">
+                <div class="canvas-container">
+                    <canvas id="polarVibrations2" width="220" height="220"></canvas>
+                    <span style="font-size:0.8em; font-weight:bold; color:var(--plan2)">Plan 2</span>
+                </div>
+                <div class="canvas-container">
+                    <canvas id="polarResult2" width="220" height="220"></canvas>
+                    <span style="font-size:0.8em; font-weight:bold; color:var(--plan2)">Plan 2</span>
+                </div>
+            </div>
+
+            <h3 style="margin-top:20px;">Simulation d'installation</h3>
+            <div class="radio-group">
+                <input type="radio" id="sim_ajout" name="sim_action" value="ajout" checked onchange="updateSimulation()">
+                <label for="sim_ajout">Ajout de masse</label>
+                <input type="radio" id="sim_retrait" name="sim_action" value="retrait" onchange="updateSimulation()">
+                <label for="sim_retrait">Retrait de masse</label>
+            </div>
+            
+            <div class="grid-2">
+                <div class="box-plan1">
+                    <h4 style="margin-top:0;">Plan 1</h4>
+                    <div class="sim-continu">
+                        <label>Masse posée (g)</label><input type="number" id="sim_p1_masse" oninput="estimerVibrations()">
+                        <label>Angle (°)</label><input type="number" id="sim_p1_phase" oninput="estimerVibrations()">
+                    </div>
+                    <div class="sim-discret" style="display:none;">
+                        <p style="font-size:0.85em; color:#555; margin-top:0; margin-bottom:5px;">Idéal: Pos <span id="p1_posA_id">-</span> (<span id="p1_posA_ang">-</span>°) <strong id="p1_posA_sugg">-</strong>g<br>Pos <span id="p1_posB_id">-</span> (<span id="p1_posB_ang">-</span>°) <strong id="p1_posB_sugg">-</strong>g</p>
+                        <label>Pos 1 : <select id="sim_p1_posA" onchange="estimerVibrations()" style="width:50%; padding:5px;"></select></label>
+                        <input type="number" id="sim_p1_masseA" oninput="estimerVibrations()" placeholder="Masse (g)">
+                        <label style="margin-top:5px;">Pos 2 : <select id="sim_p1_posB" onchange="estimerVibrations()" style="width:50%; padding:5px;"></select></label>
+                        <input type="number" id="sim_p1_masseB" oninput="estimerVibrations()" placeholder="Masse (g)">
+                    </div>
+                </div>
+                
+                <div class="box-plan2 elem-plan2" style="display:none;">
+                    <h4 style="margin-top:0;">Plan 2</h4>
+                    <div class="sim-continu">
+                        <label>Masse posée (g)</label><input type="number" id="sim_p2_masse" oninput="estimerVibrations()">
+                        <label>Angle (°)</label><input type="number" id="sim_p2_phase" oninput="estimerVibrations()">
+                    </div>
+                    <div class="sim-discret" style="display:none;">
+                        <p style="font-size:0.85em; color:#555; margin-top:0; margin-bottom:5px;">Idéal: Pos <span id="p2_posA_id">-</span> (<span id="p2_posA_ang">-</span>°) <strong id="p2_posA_sugg">-</strong>g<br>Pos <span id="p2_posB_id">-</span> (<span id="p2_posB_ang">-</span>°) <strong id="p2_posB_sugg">-</strong>g</p>
+                        <label>Pos 1 : <select id="sim_p2_posA" onchange="estimerVibrations()" style="width:50%; padding:5px;"></select></label>
+                        <input type="number" id="sim_p2_masseA" oninput="estimerVibrations()" placeholder="Masse (g)">
+                        <label style="margin-top:5px;">Pos 2 : <select id="sim_p2_posB" onchange="estimerVibrations()" style="width:50%; padding:5px;"></select></label>
+                        <input type="number" id="sim_p2_masseB" oninput="estimerVibrations()" placeholder="Masse (g)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="estimation-box">
+                <h3>Vibrations résiduelles estimées</h3>
+                <div class="grid-2">
+                    <div>
+                        <strong>Palier 1 :</strong><br>
+                        H: <span id="est_1h_a">-</span> mm/s à <span id="est_1h_p">-</span>°<br>
+                        V: <span id="est_1v_a">-</span> mm/s à <span id="est_1v_p">-</span>°
+                    </div>
+                    <div class="elem-plan2" style="display:none;">
+                        <strong>Palier 2 :</strong><br>
+                        H: <span id="est_2h_a">-</span> mm/s à <span id="est_2h_p">-</span>°<br>
+                        V: <span id="est_2v_a">-</span> mm/s à <span id="est_2v_p">-</span>°
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="handleStep5Back()">Précédent</button>
+                <button class="btn-primary" onclick="preparerAffinage()" style="margin-top:0; width:auto;">Valider et affiner (Trim)</button>
+            </div>
+        </div>
+
+        <!-- Étape 6 : Affinage -->
+        <div id="step6" class="step">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <h2>Affinage (Trim balance)</h2>
+                <button class="btn-print" onclick="preparerRapport()">Générer rapport PDF</button>
+            </div>
+            
+            <p>Saisissez les relevés de la mesure finale avec la correction en place.</p>
+            <div class="grid-2">
+                <div class="box-plan1">
+                    <h3>Mesure finale Palier 1 (V3)</h3>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v3_1h_a" placeholder="H1 Amp"><input type="number" id="v3_1h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v3_1v_a" placeholder="V1 Amp"><input type="number" id="v3_1v_p" placeholder="Phase"></div>
+                </div>
+                <div class="box-plan2 elem-plan2" style="display:none;">
+                    <h3>Mesure finale Palier 2 (V3)</h3>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;"><input type="number" id="v3_2h_a" placeholder="H2 Amp"><input type="number" id="v3_2h_p" placeholder="Phase"></div>
+                    <div style="display:flex; gap:5px;"><input type="number" id="v3_2v_a" placeholder="V2 Amp"><input type="number" id="v3_2v_p" placeholder="Phase"></div>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn-secondary" onclick="goToStep(5)">Retour aux estimations</button>
+                <button class="btn-primary" onclick="calculerAffinage()" style="margin-top:0; width:auto;">Calculer Trim</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="print_area"></div>
+</div>
+
+<script>
+    // --- Utilitaires mathématiques (Nombres Complexes) ---
+    const toRad = a => a * Math.PI / 180;
+    const toDeg = a => a * 180 / Math.PI;
+    const getC = (amp, phase) => ({ r: amp * Math.cos(toRad(phase)), i: amp * Math.sin(toRad(phase)) });
+    const getP = (c) => { 
+        let p = toDeg(Math.atan2(c.i, c.r)); 
+        return { amp: Math.sqrt(c.r*c.r + c.i*c.i), phase: p < 0 ? p + 360 : p }; 
+    };
+    const addC = (c1, c2) => ({ r: c1.r + c2.r, i: c1.i + c2.i });
+    const subC = (c1, c2) => ({ r: c1.r - c2.r, i: c1.i - c2.i });
+    const multC = (c1, c2) => ({ r: c1.r*c2.r - c1.i*c2.i, i: c1.r*c2.i + c1.i*c2.r });
+    const multCScalar = (c, s) => ({ r: c.r * s, i: c.i * s });
+    const divC = (c1, c2) => {
+        const den = c2.r*c2.r + c2.i*c2.i;
+        if(den === 0) return { r: 0, i: 0 };
+        return { r: (c1.r*c2.r + c1.i*c2.i)/den, i: (c1.i*c2.r - c1.r*c2.i)/den };
+    };
+
+    // --- État Global ---
+    let appState = { 
+        mode: '1', // '1' ou '2' plans
+        v0: {}, v1: {}, v2: {}, v3: {},
+        alpha: {}, // Coefficients d'influence
+        mt1: null, mt2: null,
+        cIdeal1: null, cIdeal2: null,
+        isoTarget: null, statusStr: "Non évalué",
+        hasTrim: false
+    };
+
+    function val(id) { return parseFloat(document.getElementById(id).value) || 0; }
+    function txt(id) { return document.getElementById(id).value; }
+    function getRadio(name) { 
+        let el = document.querySelector(`input[name="${name}"]:checked`);
+        return el ? el.value : ''; 
+    }
+
+    // --- Sauvegarde Locale ---
+    window.addEventListener('DOMContentLoaded', chargerAutoSave);
+
+    function autoSaveSession() {
+        const data = { inputs: {}, appState: appState };
+        document.querySelectorAll('input, select').forEach(el => {
+            if(el.type === 'radio') {
+                if(el.checked) data.inputs[el.name] = el.value;
+            } else if(el.type !== 'file') {
+                data.inputs[el.id] = el.value;
+            }
+        });
+        localStorage.setItem('equilibrage_data_v5', JSON.stringify(data));
+        
+        let status = document.getElementById('autosave_status');
+        let d = new Date();
+        status.innerText = "Sauvegardé à " + d.toLocaleTimeString();
+        setTimeout(() => { status.innerText = "Sauvegarde auto active"; }, 3000);
+    }
+
+    function chargerAutoSave() {
+        const saved = localStorage.getItem('equilibrage_data_v5');
+        if(saved) appliquerDonnees(saved);
+        updateUI();
+    }
+
+    function sauvegarderSessionManuelle() {
+        autoSaveSession();
+        const saved = localStorage.getItem('equilibrage_data_v5');
+        const blob = new Blob([saved], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        let tag = txt('cfg_tag') || 'machine';
+        a.href = url;
+        a.download = `equilibrage_${tag}.json`;
+        a.click();
+    }
+
+    function chargerSession(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) { appliquerDonnees(e.target.result); };
+        reader.readAsText(file);
+    }
+
+    function appliquerDonnees(jsonString) {
+        try {
+            const data = JSON.parse(jsonString);
+            appState = data.appState;
+            for(let key in data.inputs) {
+                let el = document.getElementById(key);
+                if(el) {
+                    el.value = data.inputs[key];
+                } else {
+                    let radios = document.getElementsByName(key);
+                    radios.forEach(r => { if(r.value === data.inputs[key]) r.checked = true; });
+                }
+            }
+            updateUI();
+            if(appState.cIdeal1) {
+                updateSimulation(true);
+                estimerVibrations();
+                tracerGraphiques();
+            }
+        } catch(err) { console.error("Erreur de restauration", err); }
+    }
+
+    // --- Interface & Navigation ---
+    function updateUI() {
+        appState.mode = getRadio('cfg_nb_plans');
+        const is2Planes = appState.mode === '2';
+        const isDiscrete = getRadio('cfg_type_rotor') === 'discret';
+        
+        document.querySelectorAll('.elem-plan2').forEach(el => el.style.display = is2Planes ? 'block' : 'none');
+        document.querySelectorAll('.cfg-discrete, .sim-discret, .mt-discret').forEach(el => el.style.display = isDiscrete ? 'block' : 'none');
+        document.querySelectorAll('.sim-continu, .mt-continu').forEach(el => el.style.display = isDiscrete ? 'none' : 'block');
+        
+        let btnNextStep3 = document.getElementById('btn_next_step3');
+        if(btnNextStep3) {
+            btnNextStep3.innerText = is2Planes ? "Suivant : Lancer d'essai 2" : "Calculer la correction";
+        }
+
+        dessinerSchema();
+        evaluerISO();
+    }
+
+    function goToStep(stepNumber) {
+        autoSaveSession();
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+        document.getElementById('step' + stepNumber).classList.add('active');
+        if(stepNumber === 5) { tracerGraphiques(); }
+    }
+
+    function handleStep3Next() {
+        if(appState.mode === '2') {
+            goToStep(4);
+        } else {
+            calculerCorrection();
+            goToStep(5);
+        }
+    }
+
+    function handleStep5Back() {
+        goToStep(appState.mode === '2' ? 4 : 3);
+    }
+
+    function dessinerSchema() {
+        const canvas = document.getElementById('schemaPalier');
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const center = 125;
+        const radius = 80;
+
+        ctx.clearRect(0, 0, 250, 250);
+
+        ctx.beginPath(); ctx.arc(center, center, radius, 0, 2*Math.PI);
+        ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); ctx.arc(center, center, 8, 0, 2*Math.PI);
+        ctx.fillStyle = '#666'; ctx.fill();
+
+        const rotation = getRadio('cfg_rotation');
+        const arrowRadius = 100;
+        let endX, endY, angle;
+        
+        ctx.beginPath();
+        if (rotation === 'cw') {
+            ctx.arc(center, center, arrowRadius, Math.PI * 1.3, Math.PI * 1.7);
+            endX = center + arrowRadius * Math.cos(Math.PI * 1.7); endY = center + arrowRadius * Math.sin(Math.PI * 1.7);
+            angle = Math.PI * 1.7 + Math.PI/2;
+        } else {
+            ctx.arc(center, center, arrowRadius, Math.PI * 1.7, Math.PI * 1.3, true);
+            endX = center + arrowRadius * Math.cos(Math.PI * 1.3); endY = center + arrowRadius * Math.sin(Math.PI * 1.3);
+            angle = Math.PI * 1.3 - Math.PI/2;
+        }
+        ctx.strokeStyle = '#a0aec0'; ctx.lineWidth = 2; ctx.stroke();
+        
+        ctx.beginPath(); ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - 8 * Math.cos(angle - Math.PI/6), endY - 8 * Math.sin(angle - Math.PI/6));
+        ctx.lineTo(endX - 8 * Math.cos(angle + Math.PI/6), endY - 8 * Math.sin(angle + Math.PI/6));
+        ctx.fillStyle = '#a0aec0'; ctx.fill();
+
+        let placedLabels = [];
+        const drawLine = (angleDeg, color, length, label, thin=false) => {
+            const angleRad = toRad(angleDeg - 90);
+            const x = center + length * Math.cos(angleRad);
+            const y = center + length * Math.sin(angleRad);
+            
+            ctx.beginPath(); ctx.moveTo(center, center); ctx.lineTo(x, y);
+            ctx.strokeStyle = color; ctx.lineWidth = thin ? 1 : 2; ctx.stroke();
+            
+            let textR = length + 12;
+            let textX, textY;
+            let collision = true; let iterations = 0;
+            while (collision && iterations < 15) {
+                textX = center + textR * Math.cos(angleRad);
+                textY = center + textR * Math.sin(angleRad);
+                collision = false;
+                for (let p of placedLabels) {
+                    if (Math.hypot(textX - p.x, textY - p.y) < 18) { collision = true; textR += 14; break; }
+                }
+                iterations++;
+            }
+            placedLabels.push({x: textX, y: textY});
+            ctx.fillStyle = color; ctx.font = thin ? "10px sans-serif" : "bold 11px sans-serif";
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(label, textX, textY);
+        };
+
+        if (getRadio('cfg_type_rotor') === 'discret') {
+            let nbPos = val('cfg_nb_pos'); let p1 = val('cfg_ang_p1');
+            if(nbPos > 0) { for(let i=0; i<nbPos; i++) drawLine(p1 + i * (360/nbPos), '#cbd5e0', radius, 'P'+(i+1), true); }
+        }
+        drawLine(val('cfg_ang_tacho'), '#e53e3e', radius, 'Tacho');
+        drawLine(val('cfg_ang_h1'), '#3182ce', radius, 'H1');
+        drawLine(val('cfg_ang_v1'), '#38a169', radius, 'V1');
+        
+        if (appState.mode === '2') {
+            drawLine(val('cfg_ang_h2'), '#e53e3e', radius, 'H2');
+            drawLine(val('cfg_ang_v2'), '#dd6b20', radius, 'V2');
+        }
+    }
+
+    // --- Moteur de Calcul ---
+    function getSensorsData(prefix) {
+        return {
+            h1: getC(val(`${prefix}_1h_a`), val(`${prefix}_1h_p`)),
+            v1: getC(val(`${prefix}_1v_a`), val(`${prefix}_1v_p`)),
+            h2: getC(val(`${prefix}_2h_a`), val(`${prefix}_2h_p`)),
+            v2: getC(val(`${prefix}_2v_a`), val(`${prefix}_2v_p`))
+        };
+    }
+
+    function getMt(prefix) {
+        if(getRadio('cfg_type_rotor') === 'discret') {
+            let pos = val(`${prefix}_pos`) || 1;
+            let p1 = val('cfg_ang_p1');
+            let nbPos = val('cfg_nb_pos');
+            return getC(val(`${prefix}_a`), (p1 + (pos - 1) * (360 / nbPos)) % 360);
+        }
+        return getC(val(`${prefix}_a`), val(`${prefix}_p`));
+    }
+
+    function solve2x2(v0A, v0B, a11, a21, a12, a22) {
+        let D = subC(multC(a11, a22), multC(a12, a21));
+        let num1 = subC(multC(a12, v0B), multC(a22, v0A));
+        let num2 = subC(multC(a21, v0A), multC(a11, v0B));
+        return { c1: divC(num1, D), c2: divC(num2, D) };
+    }
+
+    function calculerCorrection() {
+        appState.v0 = getSensorsData('v0');
+        appState.v1 = getSensorsData('v1');
+        appState.mt1 = getMt('mt1');
+
+        let c1_brut, c2_brut;
+
+        if(appState.mode === '1') {
+            appState.alpha.h1 = divC(subC(appState.v1.h1, appState.v0.h1), appState.mt1);
+            appState.alpha.v1 = divC(subC(appState.v1.v1, appState.v0.v1), appState.mt1);
+            
+            let ch = divC(multCScalar(appState.v0.h1, -1), appState.alpha.h1);
+            let cv = divC(multCScalar(appState.v0.v1, -1), appState.alpha.v1);
+            
+            c1_brut = { r: (ch.r + cv.r)/2, i: (ch.i + cv.i)/2 };
+            c2_brut = { r: 0, i: 0 };
+        } else {
+            appState.v2 = getSensorsData('v2');
+            appState.mt2 = getMt('mt2');
+
+            // Coefficients H
+            let a11h = divC(subC(appState.v1.h1, appState.v0.h1), appState.mt1);
+            let a21h = divC(subC(appState.v1.h2, appState.v0.h2), appState.mt1);
+            let a12h = divC(subC(appState.v2.h1, appState.v0.h1), appState.mt2);
+            let a22h = divC(subC(appState.v2.h2, appState.v0.h2), appState.mt2);
+            appState.alpha.h = { a11: a11h, a21: a21h, a12: a12h, a22: a22h };
+
+            // Coefficients V
+            let a11v = divC(subC(appState.v1.v1, appState.v0.v1), appState.mt1);
+            let a21v = divC(subC(appState.v1.v2, appState.v0.v2), appState.mt1);
+            let a12v = divC(subC(appState.v2.v1, appState.v0.v1), appState.mt2);
+            let a22v = divC(subC(appState.v2.v2, appState.v0.v2), appState.mt2);
+            appState.alpha.v = { a11: a11v, a21: a21v, a12: a12v, a22: a22v };
+
+            let resH = solve2x2(appState.v0.h1, appState.v0.h2, a11h, a21h, a12h, a22h);
+            let resV = solve2x2(appState.v0.v1, appState.v0.v2, a11v, a21v, a12v, a22v);
+
+            c1_brut = { r: (resH.c1.r + resV.c1.r)/2, i: (resH.c1.i + resV.c1.i)/2 };
+            c2_brut = { r: (resH.c2.r + resV.c2.r)/2, i: (resH.c2.i + resV.c2.i)/2 };
+        }
+
+        // Ajustement selon masses laissées
+        if(txt('etat_masse_1') === 'laisse') c1_brut = subC(c1_brut, appState.mt1);
+        if(appState.mode === '2' && txt('etat_masse_2') === 'laisse') c2_brut = subC(c2_brut, appState.mt2);
+
+        appState.cIdeal1 = c1_brut;
+        appState.cIdeal2 = c2_brut;
+
+        let p1 = getP(c1_brut); let p2 = getP(c2_brut);
+        document.getElementById('res_p1_masse').innerText = p1.amp.toFixed(1);
+        document.getElementById('res_p1_phase').innerText = p1.phase.toFixed(1);
+        document.getElementById('res_p2_masse').innerText = p2.amp.toFixed(1);
+        document.getElementById('res_p2_phase').innerText = p2.phase.toFixed(1);
+
+        updateSimulation(true);
+        autoSaveSession();
+        if(document.getElementById('step5').classList.contains('active')) tracerGraphiques();
+    }
+
+    function splitDiscrete(cIdealComplex) {
+        let ideal = getP(cIdealComplex);
+        let nbPos = val('cfg_nb_pos'); let p1 = val('cfg_ang_p1'); let pas = 360 / nbPos;
+        
+        let delta = (ideal.phase - p1 + 360) % 360;
+        let idxA = Math.floor(delta / pas); let idxB = (idxA + 1) % nbPos;
+        let angA = (p1 + idxA * pas) % 360; let angB = (p1 + idxB * pas) % 360;
+        
+        let alpha = (ideal.phase - angA + 360) % 360; let beta = pas - alpha;
+        
+        let massA = ideal.amp * (Math.sin(toRad(beta)) / Math.sin(toRad(pas)));
+        let massB = ideal.amp * (Math.sin(toRad(alpha)) / Math.sin(toRad(pas)));
+        
+        return { idxA: idxA+1, angA, massA, idxB: idxB+1, angB, massB };
+    }
+
+    function populateSelects(selectA_id, selectB_id, defA, defB) {
+        let selA = document.getElementById(selectA_id);
+        let selB = document.getElementById(selectB_id);
+        selA.innerHTML = ''; selB.innerHTML = '';
+        let nbPos = val('cfg_nb_pos'); let p1 = val('cfg_ang_p1'); let pas = 360 / nbPos;
+        for(let i=1; i<=nbPos; i++) {
+            let ang = (p1 + (i-1)*pas)%360;
+            selA.add(new Option(`P${i} (${ang.toFixed(0)}°)`, i));
+            selB.add(new Option(`P${i} (${ang.toFixed(0)}°)`, i));
+        }
+        selA.value = defA; selB.value = defB;
+    }
+
+    function updateSimulation(forceReset = false) {
+        if(!appState.cIdeal1) return;
+        const isDiscrete = getRadio('cfg_type_rotor') === 'discret';
+        const isRetrait = getRadio('sim_action') === 'retrait';
+        
+        let c1_sim = isRetrait ? multCScalar(appState.cIdeal1, -1) : appState.cIdeal1;
+        let c2_sim = isRetrait ? multCScalar(appState.cIdeal2, -1) : appState.cIdeal2;
+
+        if (isDiscrete) {
+            let d1 = splitDiscrete(c1_sim);
+            document.getElementById('p1_posA_id').innerText = d1.idxA; 
+            document.getElementById('p1_posA_ang').innerText = d1.angA.toFixed(0); 
+            document.getElementById('p1_posA_sugg').innerText = d1.massA.toFixed(1);
+            document.getElementById('p1_posB_id').innerText = d1.idxB; 
+            document.getElementById('p1_posB_ang').innerText = d1.angB.toFixed(0); 
+            document.getElementById('p1_posB_sugg').innerText = d1.massB.toFixed(1);
+            
+            if(forceReset) {
+                populateSelects('sim_p1_posA', 'sim_p1_posB', d1.idxA, d1.idxB);
+                document.getElementById('sim_p1_masseA').value = d1.massA.toFixed(1);
+                document.getElementById('sim_p1_masseB').value = d1.massB.toFixed(1);
+            }
+
+            if(appState.mode === '2' && c2_sim) {
+                let d2 = splitDiscrete(c2_sim);
+                document.getElementById('p2_posA_id').innerText = d2.idxA; 
+                document.getElementById('p2_posA_ang').innerText = d2.angA.toFixed(0); 
+                document.getElementById('p2_posA_sugg').innerText = d2.massA.toFixed(1);
+                document.getElementById('p2_posB_id').innerText = d2.idxB; 
+                document.getElementById('p2_posB_ang').innerText = d2.angB.toFixed(0); 
+                document.getElementById('p2_posB_sugg').innerText = d2.massB.toFixed(1);
+
+                if(forceReset) {
+                    populateSelects('sim_p2_posA', 'sim_p2_posB', d2.idxA, d2.idxB);
+                    document.getElementById('sim_p2_masseA').value = d2.massA.toFixed(1);
+                    document.getElementById('sim_p2_masseB').value = d2.massB.toFixed(1);
+                }
+            }
+        } else {
+            if(forceReset) {
+                let p1 = getP(c1_sim);
+                document.getElementById('sim_p1_masse').value = p1.amp.toFixed(1);
+                document.getElementById('sim_p1_phase').value = p1.phase.toFixed(1);
+                if(appState.mode === '2' && c2_sim) {
+                    let p2 = getP(c2_sim);
+                    document.getElementById('sim_p2_masse').value = p2.amp.toFixed(1);
+                    document.getElementById('sim_p2_phase').value = p2.phase.toFixed(1);
+                }
+            }
+        }
+        estimerVibrations();
+    }
+
+    function getSimVector(prefix) {
+        const isDiscrete = getRadio('cfg_type_rotor') === 'discret';
+        const isRetrait = getRadio('sim_action') === 'retrait';
+        let vec;
+        if(isDiscrete) {
+            let p1 = val('cfg_ang_p1'); let pas = 360 / val('cfg_nb_pos');
+            let idxA = val(`${prefix}_posA`) || 1; let idxB = val(`${prefix}_posB`) || 1;
+            let mA = getC(val(`${prefix}_masseA`), (p1 + (idxA - 1) * pas) % 360);
+            let mB = getC(val(`${prefix}_masseB`), (p1 + (idxB - 1) * pas) % 360);
+            vec = addC(mA, mB);
+        } else {
+            vec = getC(val(`${prefix}_masse`), val(`${prefix}_phase`));
+        }
+        return isRetrait ? multCScalar(vec, -1) : vec;
+    }
+
+    function estimerVibrations() {
+        if(!appState.v0 || !appState.v0.h1) return;
+        
+        let sim1 = getSimVector('sim_p1');
+        let sim2 = appState.mode === '2' ? getSimVector('sim_p2') : {r:0, i:0};
+
+        let vTotal1 = sim1; let vTotal2 = sim2;
+        if(txt('etat_masse_1') === 'laisse') vTotal1 = addC(appState.mt1, sim1);
+        if(appState.mode === '2' && txt('etat_masse_2') === 'laisse') vTotal2 = addC(appState.mt2, sim2);
+
+        let estH1, estV1, estH2, estV2;
+
+        if(appState.mode === '1') {
+            estH1 = addC(appState.v0.h1, multC(appState.alpha.h1, vTotal1));
+            estV1 = addC(appState.v0.v1, multC(appState.alpha.v1, vTotal1));
+        } else {
+            estH1 = addC(appState.v0.h1, addC(multC(appState.alpha.h.a11, vTotal1), multC(appState.alpha.h.a12, vTotal2)));
+            estH2 = addC(appState.v0.h2, addC(multC(appState.alpha.h.a21, vTotal1), multC(appState.alpha.h.a22, vTotal2)));
+            estV1 = addC(appState.v0.v1, addC(multC(appState.alpha.v.a11, vTotal1), multC(appState.alpha.v.a12, vTotal2)));
+            estV2 = addC(appState.v0.v2, addC(multC(appState.alpha.v.a21, vTotal1), multC(appState.alpha.v.a22, vTotal2)));
+        }
+
+        let p_h1 = getP(estH1); let p_v1 = getP(estV1);
+        document.getElementById('est_1h_a').innerText = p_h1.amp.toFixed(2); document.getElementById('est_1h_p').innerText = p_h1.phase.toFixed(0);
+        document.getElementById('est_1v_a').innerText = p_v1.amp.toFixed(2); document.getElementById('est_1v_p').innerText = p_v1.phase.toFixed(0);
+
+        if(appState.mode === '2') {
+            let p_h2 = getP(estH2); let p_v2 = getP(estV2);
+            document.getElementById('est_2h_a').innerText = p_h2.amp.toFixed(2); document.getElementById('est_2h_p').innerText = p_h2.phase.toFixed(0);
+            document.getElementById('est_2v_a').innerText = p_v2.amp.toFixed(2); document.getElementById('est_2v_p').innerText = p_v2.phase.toFixed(0);
+        }
+
+        evaluerISO();
+    }
+
+    function evaluerISO() {
+        let m_rotor = val('cfg_masse_rotor'); let r_corr = val('cfg_rayon_corr'); let rpm = val('cfg_rpm');
+        let badge = document.getElementById('badge_iso_status'); let detail = document.getElementById('iso_detail');
+
+        if (m_rotor > 0 && r_corr > 0 && rpm > 0 && appState.cIdeal1) {
+            let u_per = (9549 * parseFloat(getRadio('cfg_grade_iso')) * m_rotor) / rpm;
+            appState.isoTarget = (appState.mode === '2' ? u_per / 2 : u_per) / r_corr;
+            document.getElementById('iso_mass_target').innerText = appState.isoTarget.toFixed(1);
+            
+            let init1 = getP(appState.cIdeal1).amp;
+            let init2 = appState.mode === '2' ? getP(appState.cIdeal2).amp : 0;
+            
+            let isOk = appState.mode === '1' ? (init1 <= appState.isoTarget) : (init1 <= appState.isoTarget && init2 <= appState.isoTarget);
+            
+            badge.className = isOk ? "badge badge-ok" : "badge badge-nok";
+            badge.innerText = isOk ? "ISO OK" : "ISO NOK";
+            appState.statusStr = isOk ? "OK" : "NOK";
+            detail.innerText = `Balourd initial : P1=${init1.toFixed(1)}g` + (appState.mode==='2' ? ` | P2=${init2.toFixed(1)}g` : '');
+        } else {
+            badge.className = "badge badge-na"; badge.innerText = "Non évalué"; appState.statusStr = "Non évalué";
+            detail.innerText = `En attente données`;
+        }
+    }
+
+    // --- Graphiques ---
+    function drawPolar(canvasId, vectors, maxAmpGlobal = null) {
+        const canvas = document.getElementById(canvasId);
+        if(!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const center = canvas.width / 2;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+        for(let i=1; i<=3; i++) { ctx.beginPath(); ctx.arc(center, center, i*(center*0.3), 0, 2*Math.PI); ctx.stroke(); }
+        ctx.beginPath(); ctx.moveTo(center, 10); ctx.lineTo(center, canvas.height-10); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10, center); ctx.lineTo(canvas.width-10, center); ctx.stroke();
+
+        if(!vectors || vectors.length === 0) return;
+        let maxAmp = maxAmpGlobal || Math.max(...vectors.map(v => v.amp));
+        if (maxAmp <= 0) maxAmp = 1;
+
+        vectors.forEach(v => {
+            if(v.amp === undefined || isNaN(v.amp)) return;
+            const r = (v.amp / maxAmp) * (center * 0.85);
+            const a = toRad(v.phase - 90);
+            const ex = center + r * Math.cos(a); const ey = center + r * Math.sin(a);
+            
+            ctx.beginPath(); ctx.moveTo(center, center); ctx.lineTo(ex, ey);
+            ctx.strokeStyle = v.color; ctx.lineWidth = 2; ctx.stroke();
+            ctx.beginPath(); ctx.arc(ex, ey, 4, 0, 2*Math.PI); ctx.fillStyle = v.color; ctx.fill();
+
+            ctx.font = "11px sans-serif"; ctx.fillStyle = "#333";
+            let tx = ex + (Math.cos(a)>0?5:-25); let ty = ey + (Math.sin(a)>0?10:-5);
+            ctx.fillText(v.label, tx, ty);
+        });
+    }
+
+    function tracerGraphiques() {
+        if(!appState.v0 || !appState.v0.h1) return;
+        
+        let v1_arr = []; let v2_arr = [];
+        v1_arr.push({amp: getP(appState.v0.h1).amp, phase: getP(appState.v0.h1).phase, color: '#3182ce', label: 'V0 H1'});
+        v1_arr.push({amp: getP(appState.v0.v1).amp, phase: getP(appState.v0.v1).phase, color: '#38a169', label: 'V0 V1'});
+        if(appState.v1 && appState.v1.h1) {
+            v1_arr.push({amp: getP(appState.v1.h1).amp, phase: getP(appState.v1.h1).phase, color: '#63b3ed', label: 'V1 H1'});
+            v1_arr.push({amp: getP(appState.v1.v1).amp, phase: getP(appState.v1.v1).phase, color: '#68d391', label: 'V1 V1'});
+        }
+        if(appState.hasTrim && appState.v3 && appState.v3.h1) {
+            v1_arr.push({amp: getP(appState.v3.h1).amp, phase: getP(appState.v3.h1).phase, color: '#2b6cb0', label: 'V3 H1'});
+        }
+        drawPolar('polarVibrations1', v1_arr);
+
+        if(appState.cIdeal1) {
+            drawPolar('polarResult1', [{amp: getP(appState.cIdeal1).amp, phase: getP(appState.cIdeal1).phase, color: '#e53e3e', label: 'Cible 1'}]);
+        }
+
+        if(appState.mode === '2') {
+            v2_arr.push({amp: getP(appState.v0.h2).amp, phase: getP(appState.v0.h2).phase, color: '#3182ce', label: 'V0 H2'});
+            v2_arr.push({amp: getP(appState.v0.v2).amp, phase: getP(appState.v0.v2).phase, color: '#38a169', label: 'V0 V2'});
+            if(appState.v2 && appState.v2.h2) {
+                v2_arr.push({amp: getP(appState.v2.h2).amp, phase: getP(appState.v2.h2).phase, color: '#f6ad55', label: 'V2 H2'});
+                v2_arr.push({amp: getP(appState.v2.v2).amp, phase: getP(appState.v2.v2).phase, color: '#ecc94b', label: 'V2 V2'});
+            }
+            if(appState.hasTrim && appState.v3 && appState.v3.h2) {
+                v2_arr.push({amp: getP(appState.v3.h2).amp, phase: getP(appState.v3.h2).phase, color: '#dd6b20', label: 'V3 H2'});
+            }
+            drawPolar('polarVibrations2', v2_arr);
+            
+            if(appState.cIdeal2) {
+                drawPolar('polarResult2', [{amp: getP(appState.cIdeal2).amp, phase: getP(appState.cIdeal2).phase, color: '#e53e3e', label: 'Cible 2'}]);
+            }
+        }
+    }
+
+    // --- Affinage ---
+    function preparerAffinage() { goToStep(6); }
+
+    function calculerAffinage() {
+        appState.hasTrim = true;
+        appState.v3 = getSensorsData('v3');
+        
+        let c1_trim, c2_trim;
+
+        if(appState.mode === '1') {
+            let ch = divC(multCScalar(appState.v3.h1, -1), appState.alpha.h1);
+            let cv = divC(multCScalar(appState.v3.v1, -1), appState.alpha.v1);
+            c1_trim = { r: (ch.r + cv.r)/2, i: (ch.i + cv.i)/2 };
+            c2_trim = { r: 0, i: 0 };
+        } else {
+            let resH = solve2x2(appState.v3.h1, appState.v3.h2, appState.alpha.h.a11, appState.alpha.h.a21, appState.alpha.h.a12, appState.alpha.h.a22);
+            let resV = solve2x2(appState.v3.v1, appState.v3.v2, appState.alpha.v.a11, appState.alpha.v.a21, appState.alpha.v.a12, appState.alpha.v.a22);
+            c1_trim = { r: (resH.c1.r + resV.c1.r)/2, i: (resH.c1.i + resV.c1.i)/2 };
+            c2_trim = { r: (resH.c2.r + resV.c2.r)/2, i: (resH.c2.i + resV.c2.i)/2 };
+        }
+
+        appState.cIdeal1 = c1_trim;
+        appState.cIdeal2 = c2_trim;
+        appState.v0 = appState.v3; // La nouvelle référence est V3
+        
+        // CORRECTION DE L'ERREUR (utilisation des éléments select au lieu des anciens boutons radio)
+        document.getElementById('etat_masse_1').value = 'retiree';
+        if(appState.mode === '2') document.getElementById('etat_masse_2').value = 'retiree';
+
+        let p1 = getP(c1_trim); let p2 = getP(c2_trim);
+        document.getElementById('res_p1_masse').innerText = p1.amp.toFixed(1); document.getElementById('res_p1_phase').innerText = p1.phase.toFixed(1);
+        document.getElementById('res_p2_masse').innerText = p2.amp.toFixed(1); document.getElementById('res_p2_phase').innerText = p2.phase.toFixed(1);
+        
+        updateSimulation(true);
+        goToStep(5);
+    }
+
+    function preparerRapport() {
+        const d = new Date();
+        const tag = txt('cfg_tag') || 'Non spécifié';
+        const modeTxt = appState.mode === '2' ? '2 Plans' : '1 Plan';
+        
+        let html = `
+            <h2>Rapport d'intervention : Équilibrage ${modeTxt}</h2>
+            <p><strong>Machine :</strong> ${tag} | <strong>Date :</strong> ${d.toLocaleDateString()} ${d.toLocaleTimeString()}</p>
+            <div style="background:#f2f2f2; padding:10px; margin-bottom:15px;">
+                <strong>Statut ISO 21940 : ${appState.statusStr}</strong>
+            </div>
+            
+            <h3>1. Relevés vibratoires</h3>
+            <table style="font-size:0.85em;">
+                <tr><th>Étape</th><th>H1</th><th>V1</th>${appState.mode==='2'?'<th>H2</th><th>V2</th>':''}</tr>
+                <tr><td>V0 (Vide)</td><td>${val('v0_1h_a')} à ${val('v0_1h_p')}°</td><td>${val('v0_1v_a')} à ${val('v0_1v_p')}°</td>
+                ${appState.mode==='2'? `<td>${val('v0_2h_a')} à ${val('v0_2h_p')}°</td><td>${val('v0_2v_a')} à ${val('v0_2v_p')}°</td>`:''}</tr>
+                <tr><td>V1 (Mt1)</td><td>${val('v1_1h_a')} à ${val('v1_1h_p')}°</td><td>${val('v1_1v_a')} à ${val('v1_1v_p')}°</td>
+                ${appState.mode==='2'? `<td>${val('v1_2h_a')} à ${val('v1_2h_p')}°</td><td>${val('v1_2v_a')} à ${val('v1_2v_p')}°</td>`:''}</tr>
+                ${appState.mode==='2'? `<tr><td>V2 (Mt2)</td><td>${val('v2_1h_a')} à ${val('v2_1h_p')}°</td><td>${val('v2_1v_a')} à ${val('v2_1v_p')}°</td><td>${val('v2_2h_a')} à ${val('v2_2h_p')}°</td><td>${val('v2_2v_a')} à ${val('v2_2v_p')}°</td></tr>`:''}
+            </table>
+
+            <div class="print-graphs">
+                <img id="p_sch" class="print-img">
+                <img id="p_v1" class="print-img">
+                ${appState.mode==='2' ? '<img id="p_v2" class="print-img">' : ''}
+            </div>
+
+            <h3>2. Corrections appliquées</h3>
+            <p>Action : ${getRadio('sim_action')}</p>
+            <table>
+                <tr><th>Plan</th><th>Vecteur appliqué</th></tr>
+                <tr><td>Plan 1</td><td>${getP(getSimVector('sim_p1')).amp.toFixed(1)} g à ${getP(getSimVector('sim_p1')).phase.toFixed(1)}°</td></tr>
+                ${appState.mode==='2' ? `<tr><td>Plan 2</td><td>${getP(getSimVector('sim_p2')).amp.toFixed(1)} g à ${getP(getSimVector('sim_p2')).phase.toFixed(1)}°</td></tr>`:''}
+            </table>
+            
+            <div class="print-graphs">
+                <img id="p_c1" class="print-img">
+                ${appState.mode==='2' ? '<img id="p_c2" class="print-img">' : ''}
+            </div>
+        `;
+
+        document.getElementById('print_area').innerHTML = html;
+        document.getElementById('p_sch').src = document.getElementById('schemaPalier').toDataURL();
+        document.getElementById('p_v1').src = document.getElementById('polarVibrations1').toDataURL();
+        document.getElementById('p_c1').src = document.getElementById('polarResult1').toDataURL();
+        if(appState.mode === '2') {
+            document.getElementById('p_v2').src = document.getElementById('polarVibrations2').toDataURL();
+            document.getElementById('p_c2').src = document.getElementById('polarResult2').toDataURL();
+        }
+
+        setTimeout(() => { window.print(); }, 400);
+    }
+
+    updateUI();
+
+    // Enregistrement du service worker (fonctionnement hors-ligne, installable)
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch((err) => {
+                console.warn('Service worker non enregistré :', err);
+            });
+        });
+    }
+</script>
+</body>
+</html>
