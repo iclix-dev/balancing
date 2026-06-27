@@ -1,8 +1,0 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "io.github.iclix_dev.twa",
-        "sha256_cert_fingerprints": ["37:37:07:9D:9F:9A:F2:8D:0B:BE:97:C5:3A:F8:73:B6:D5:E8:81:0E:F3:0C:1D:E0:30:0F:07:44:C3:A1:4F:56"]
-      }
-    }]
